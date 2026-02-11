@@ -4247,6 +4247,14 @@
                     <p class="header-subtitle" id="pageSubtitle">Overview of studio capacity and active projects</p>
                 </div>
                 <div class="header-actions">
+                    <button class="btn btn-secondary" id="saveToCloudBtn" onclick="manualSaveToSupabase()" title="Save all data to cloud" style="display:none;">
+                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
+                            <polyline points="17 21 17 13 7 13 7 21"></polyline>
+                            <polyline points="7 3 7 8 15 8"></polyline>
+                        </svg>
+                        <span id="saveToCloudLabel">Save to Cloud</span>
+                    </button>
                     <button class="btn btn-secondary" id="addTeamBtn">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
@@ -9236,7 +9244,8 @@ END:VEVENT
         function updateSupabaseStatus() {
             const statusEl = document.getElementById('supabaseStatus');
             const urlInput = document.getElementById('supabaseApiUrl');
-            
+            const saveBtn = document.getElementById('saveToCloudBtn');
+
             if (statusEl) {
                 if (supabaseSettings.connected) {
                     statusEl.innerHTML = `
@@ -9247,9 +9256,14 @@ END:VEVENT
                     statusEl.innerHTML = '<span style="color: var(--text-muted);">○ Not connected</span>';
                 }
             }
-            
+
             if (urlInput) {
                 urlInput.value = supabaseSettings.apiUrl;
+            }
+
+            // Show/hide the Save to Cloud button in the header
+            if (saveBtn) {
+                saveBtn.style.display = supabaseSettings.connected ? '' : 'none';
             }
         }
         
@@ -9296,15 +9310,64 @@ END:VEVENT
             }
         }
         
-        // Manual save to Supabase
+        // Manual save to Supabase (forced — bypasses concurrency guard)
         async function manualSaveToSupabase() {
             if (!supabaseSettings.connected) {
                 alert('Please connect to Supabase first');
                 return;
             }
-            
-            showSyncToast('Saving...', 'success');
-            await saveToSupabase();
+
+            const btn = document.getElementById('saveToCloudBtn');
+            const label = document.getElementById('saveToCloudLabel');
+            if (btn) btn.disabled = true;
+            if (label) label.textContent = 'Saving...';
+            showSyncToast('Saving to cloud...', 'success');
+
+            try {
+                // Force a direct save — bypass _isSaving guard
+                const response = await fetch(`${supabaseSettings.apiUrl}/api/supabase/sync`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        team: state.team,
+                        clients: state.clients,
+                        projects: state.projects.map(p => ({
+                            ...p,
+                            startDate: p.startDate instanceof Date ? p.startDate.toISOString() : p.startDate,
+                            endDate: p.endDate instanceof Date ? p.endDate.toISOString() : p.endDate,
+                            phases: (p.phases || []).map(ph => ({
+                                ...ph,
+                                start: ph.start instanceof Date ? ph.start.toISOString() : ph.start,
+                                end: ph.end instanceof Date ? ph.end.toISOString() : ph.end
+                            }))
+                        })),
+                        projectTypes: projectTemplates
+                    })
+                });
+
+                const result = await response.json();
+                console.log('Manual save result:', JSON.stringify(result, null, 2));
+
+                if (result.success) {
+                    supabaseSettings.lastSync = new Date();
+                    updateSupabaseStatus();
+                    if (result.errors?.length > 0) {
+                        showSyncToast(`Saved with ${result.errors.length} warnings`, 'success');
+                        console.warn('Save warnings:', result.errors);
+                    } else {
+                        showSyncToast('Saved to cloud ✓', 'success');
+                    }
+                } else {
+                    showSyncToast('Save failed: ' + (result.error || 'Unknown'), 'error');
+                    console.error('Manual save failed:', result);
+                }
+            } catch (error) {
+                showSyncToast('Save failed: ' + error.message, 'error');
+                console.error('Manual save error:', error);
+            } finally {
+                if (btn) btn.disabled = false;
+                if (label) label.textContent = 'Save to Cloud';
+            }
         }
         
         // Render current view (used after data load)
