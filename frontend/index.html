@@ -2055,9 +2055,15 @@
             color: var(--accent-green);
         }
 
-        .status-badge.completed {
+        .status-badge.completed,
+        .status-badge.done {
             background: var(--bg-tertiary);
             color: var(--text-muted);
+        }
+
+        .status-badge.in-progress {
+            background: rgba(0, 212, 170, 0.12);
+            color: var(--accent-neon);
         }
 
         .status-badge.paused {
@@ -4436,6 +4442,7 @@
                                 <button class="view-toggle-btn">Active</button>
                                 <button class="view-toggle-btn">Pipeline</button>
                                 <button class="view-toggle-btn">Completed</button>
+                                <button class="view-toggle-btn">Paused</button>
                             </div>
                         </div>
                         <table class="projects-table" id="projectsTable">
@@ -4819,10 +4826,12 @@
                             <select class="form-input" id="editProjectStatus">
                                 <option value="pipeline">Pipeline</option>
                                 <option value="active">Active</option>
+                                <option value="in progress">In Progress</option>
                                 <option value="retainer">Retainer</option>
                                 <option value="hourly">Hourly</option>
-                                <option value="paused">Paused</option>
                                 <option value="pending approval">Pending Approval</option>
+                                <option value="paused">Paused</option>
+                                <option value="done">Done</option>
                                 <option value="completed">Completed</option>
                                 <option value="canceled">Canceled</option>
                             </select>
@@ -5937,7 +5946,7 @@
         // Calculate hours for a specific team member on a specific day
         // Helper: check if a project counts as "work in progress" for capacity/workload
         function isWorkingStatus(status) {
-            const inactive = ['completed', 'canceled', 'cancelled', 'paused', 'pipeline'];
+            const inactive = ['completed', 'done', 'canceled', 'cancelled', 'paused', 'pipeline'];
             return !inactive.includes((status || '').toLowerCase());
         }
 
@@ -6173,7 +6182,22 @@
 
             let filteredProjects = state.projects;
             if (currentProjectFilter !== 'all') {
-                filteredProjects = state.projects.filter(p => p.status === currentProjectFilter);
+                if (currentProjectFilter === 'active') {
+                    // Active tab: all "working" statuses
+                    const activeStatuses = ['active', 'in progress', 'hourly', 'pending approval', 'retainer', 'symphony'];
+                    filteredProjects = state.projects.filter(p => activeStatuses.includes((p.status || '').toLowerCase()));
+                } else if (currentProjectFilter === 'completed') {
+                    // Completed tab: done/completed
+                    const doneStatuses = ['completed', 'done'];
+                    filteredProjects = state.projects.filter(p => doneStatuses.includes((p.status || '').toLowerCase()));
+                } else if (currentProjectFilter === 'paused') {
+                    // Paused tab: paused and canceled
+                    const pausedStatuses = ['paused', 'canceled', 'cancelled'];
+                    filteredProjects = state.projects.filter(p => pausedStatuses.includes((p.status || '').toLowerCase()));
+                } else {
+                    // Pipeline or any other exact match
+                    filteredProjects = state.projects.filter(p => (p.status || '').toLowerCase() === currentProjectFilter);
+                }
             }
 
             // Apply search filter
@@ -6206,7 +6230,7 @@
             
             tbody.innerHTML = filteredProjects.map(project => {
                 const teamMembers = project.team.map(id => state.team.find(t => t.id === id)).filter(Boolean);
-                const knownStatuses = ['pipeline', 'active', 'completed', 'paused', 'pending', 'pending-approval', 'canceled', 'cancelled', 'retainer', 'hourly', 'symphony'];
+                const knownStatuses = ['pipeline', 'active', 'completed', 'done', 'in-progress', 'paused', 'pending', 'pending-approval', 'canceled', 'cancelled', 'retainer', 'hourly', 'symphony'];
                 const rawStatus = (project.status || 'pipeline').toLowerCase().replace(/\s+/g, '-');
                 const statusClass = knownStatuses.includes(rawStatus) ? rawStatus : `status-other ${rawStatus}`;
                 const statusLabel = (project.status || 'Pipeline').split(/[\s-]+/).map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
@@ -6337,10 +6361,12 @@
         const statusOptions = [
             { value: 'pipeline', label: 'Pipeline', color: 'var(--accent-olive)' },
             { value: 'active', label: 'Active', color: 'var(--accent-green)' },
+            { value: 'in progress', label: 'In Progress', color: 'var(--accent-neon)' },
             { value: 'retainer', label: 'Retainer', color: 'var(--accent-neon)' },
             { value: 'hourly', label: 'Hourly', color: '#8b9fd4' },
-            { value: 'paused', label: 'Paused', color: 'var(--accent-amber)' },
             { value: 'pending approval', label: 'Pending Approval', color: '#c9a84c' },
+            { value: 'paused', label: 'Paused', color: 'var(--accent-amber)' },
+            { value: 'done', label: 'Done', color: 'var(--text-muted)' },
             { value: 'completed', label: 'Completed', color: 'var(--text-muted)' },
             { value: 'canceled', label: 'Canceled', color: 'var(--accent-red)' },
         ];
@@ -7670,7 +7696,7 @@
             btn.addEventListener('click', () => {
                 projectFilterToggles.forEach(b => b.classList.remove('active'));
                 btn.classList.add('active');
-                const filters = ['all', 'active', 'pipeline', 'completed'];
+                const filters = ['all', 'active', 'pipeline', 'completed', 'paused'];
                 currentProjectFilter = filters[index];
                 renderProjects();
             });
@@ -7901,7 +7927,7 @@
                     const s = p.status || 'pipeline';
                     statusCounts[s] = (statusCounts[s] || 0) + 1;
                 });
-                const knownStatuses = ['pipeline', 'active', 'completed', 'paused', 'pending', 'pending-approval', 'canceled', 'cancelled', 'retainer', 'hourly', 'symphony'];
+                const knownStatuses = ['pipeline', 'active', 'completed', 'done', 'in-progress', 'paused', 'pending', 'pending-approval', 'canceled', 'cancelled', 'retainer', 'hourly', 'symphony'];
                 const statusBadgesHtml = Object.entries(statusCounts).map(([status, count]) => {
                     const raw = status.toLowerCase().replace(/\s+/g, '-');
                     const cls = knownStatuses.includes(raw) ? raw : `status-other ${raw}`;
