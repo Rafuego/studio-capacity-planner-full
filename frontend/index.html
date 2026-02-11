@@ -2105,6 +2105,74 @@
             background: currentColor;
         }
 
+        /* Inline status picker */
+        .status-badge-clickable {
+            cursor: pointer;
+            position: relative;
+            transition: opacity 0.15s ease;
+        }
+
+        .status-badge-clickable:hover {
+            opacity: 0.8;
+        }
+
+        .status-badge-clickable::after {
+            content: '▾';
+            margin-left: 4px;
+            font-size: 10px;
+            opacity: 0.6;
+        }
+
+        .status-dropdown {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            z-index: 1000;
+            background: var(--bg-elevated);
+            border: 1px solid var(--border-subtle);
+            border-radius: 8px;
+            padding: 4px;
+            min-width: 160px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+            display: none;
+        }
+
+        .status-dropdown.open {
+            display: block;
+        }
+
+        .status-dropdown-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 500;
+            cursor: pointer;
+            border: none;
+            background: none;
+            width: 100%;
+            text-align: left;
+            color: var(--text-primary);
+            transition: background 0.1s ease;
+        }
+
+        .status-dropdown-item:hover {
+            background: var(--bg-tertiary);
+        }
+
+        .status-dropdown-item.current {
+            background: var(--bg-tertiary);
+        }
+
+        .status-dropdown-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            flex-shrink: 0;
+        }
+
         /* Extraction Preview */
         .extraction-preview {
             background: var(--bg-tertiary);
@@ -5677,7 +5745,7 @@
         function getActiveProjectsForDay(date) {
             return state.projects
                 .filter(project => {
-                    if (project.status !== 'active') return false;
+                    if (!isWorkingStatus(project.status)) return false;
                     return project.phases.some(phase => date >= phase.start && date <= phase.end);
                 })
                 .map(p => p.name);
@@ -5695,9 +5763,9 @@
             let allocatedHours = 0;
             
             state.projects.forEach(project => {
-                // Only count active projects
-                if (project.status !== 'active') return;
-                
+                // Only count projects that are actively being worked on
+                if (!isWorkingStatus(project.status)) return;
+
                 // Skip projects with archived clients
                 if (project.clientId) {
                     const client = state.clients.find(c => c.id === project.clientId);
@@ -5798,8 +5866,8 @@
                 const totalStatus = totalPercentage < 60 ? 'available' : totalPercentage < 85 ? 'busy' : 'full';
                 
                 // Get assigned projects
-                const assignedProjects = state.projects.filter(p => 
-                    p.status === 'active' && p.team.includes(member.id)
+                const assignedProjects = state.projects.filter(p =>
+                    isWorkingStatus(p.status) && p.team.includes(member.id)
                 );
                 
                 return `
@@ -5867,11 +5935,17 @@
         }
 
         // Calculate hours for a specific team member on a specific day
+        // Helper: check if a project counts as "work in progress" for capacity/workload
+        function isWorkingStatus(status) {
+            const inactive = ['completed', 'canceled', 'cancelled', 'paused', 'pipeline'];
+            return !inactive.includes((status || '').toLowerCase());
+        }
+
         function calculateMemberDayHours(memberId, date) {
             let hours = 0;
-            
+
             state.projects.forEach(project => {
-                if (project.status !== 'active') return;
+                if (!isWorkingStatus(project.status)) return;
                 if (!project.team.includes(memberId)) return;
                 
                 // Check if any phase is active on this date
@@ -6215,10 +6289,22 @@
                         </td>
                         <td>${project.client}</td>
                         <td>
+                            ${adminUser ? `
+                            <div style="position: relative; display: inline-block;">
+                                <span class="status-badge status-badge-clickable ${statusClass}" onclick="toggleStatusDropdown(event, ${project.id})">
+                                    <span class="status-dot"></span>
+                                    ${statusLabel}
+                                </span>
+                                <div class="status-dropdown" id="statusDropdown-${project.id}">
+                                    ${getStatusDropdownOptions(project.id, project.status)}
+                                </div>
+                            </div>
+                            ` : `
                             <span class="status-badge ${statusClass}">
                                 <span class="status-dot"></span>
                                 ${statusLabel}
                             </span>
+                            `}
                             ${timeHtml}
                         </td>
                         <td>
@@ -6247,6 +6333,57 @@
             }).join('');
         }
         
+        // Inline status dropdown functions
+        const statusOptions = [
+            { value: 'pipeline', label: 'Pipeline', color: 'var(--accent-olive)' },
+            { value: 'active', label: 'Active', color: 'var(--accent-green)' },
+            { value: 'retainer', label: 'Retainer', color: 'var(--accent-neon)' },
+            { value: 'hourly', label: 'Hourly', color: '#8b9fd4' },
+            { value: 'paused', label: 'Paused', color: 'var(--accent-amber)' },
+            { value: 'pending approval', label: 'Pending Approval', color: '#c9a84c' },
+            { value: 'completed', label: 'Completed', color: 'var(--text-muted)' },
+            { value: 'canceled', label: 'Canceled', color: 'var(--accent-red)' },
+        ];
+
+        function getStatusDropdownOptions(projectId, currentStatus) {
+            return statusOptions.map(opt => `
+                <button class="status-dropdown-item ${opt.value === currentStatus ? 'current' : ''}"
+                        onclick="changeProjectStatus(${projectId}, '${opt.value}')">
+                    <span class="status-dropdown-dot" style="background: ${opt.color};"></span>
+                    ${opt.label}
+                </button>
+            `).join('');
+        }
+
+        function toggleStatusDropdown(event, projectId) {
+            event.stopPropagation();
+            // Close any other open dropdowns
+            document.querySelectorAll('.status-dropdown.open').forEach(d => {
+                if (d.id !== `statusDropdown-${projectId}`) d.classList.remove('open');
+            });
+            const dropdown = document.getElementById(`statusDropdown-${projectId}`);
+            dropdown.classList.toggle('open');
+        }
+
+        function changeProjectStatus(projectId, newStatus) {
+            const project = state.projects.find(p => p.id === projectId);
+            if (!project) return;
+            project.status = newStatus;
+
+            // Close dropdown
+            document.querySelectorAll('.status-dropdown.open').forEach(d => d.classList.remove('open'));
+
+            // Re-render and save
+            renderProjects();
+            renderDashboard();
+            debouncedSaveToSupabase();
+        }
+
+        // Close status dropdowns when clicking outside
+        document.addEventListener('click', () => {
+            document.querySelectorAll('.status-dropdown.open').forEach(d => d.classList.remove('open'));
+        });
+
         // Advance project to next phase
         function advancePhase(projectId) {
             const project = state.projects.find(p => p.id === projectId);
@@ -6704,7 +6841,7 @@
             const teamHtml = state.team.map(member => {
                 // Calculate utilization
                 const assignedHours = state.projects
-                    .filter(p => p.status === 'active' && p.team.includes(member.id))
+                    .filter(p => isWorkingStatus(p.status) && p.team.includes(member.id))
                     .reduce((sum, p) => sum + (p.hoursPerWeek / p.team.length), 0);
                 const utilization = Math.round((assignedHours / member.capacity) * 100);
                 const statusClass = utilization < 60 ? 'available' : utilization < 85 ? 'busy' : 'full';
@@ -7640,7 +7777,7 @@
             today.setHours(0, 0, 0, 0);
             
             // Check for overdue phases
-            state.projects.filter(p => p.status === 'active').forEach(project => {
+            state.projects.filter(p => isWorkingStatus(p.status)).forEach(project => {
                 project.phases.forEach(phase => {
                     const endDate = new Date(phase.end);
                     if (phase.status === 'in-progress' && endDate < today) {
@@ -7687,7 +7824,7 @@
             }
             
             // Check for stale projects (no activity in 14 days)
-            state.projects.filter(p => p.status === 'active').forEach(project => {
+            state.projects.filter(p => isWorkingStatus(p.status)).forEach(project => {
                 const lastNote = project.notes?.length > 0 ? 
                     new Date(Math.max(...project.notes.map(n => new Date(n.date)))) : null;
                 if (!lastNote || (today - lastNote) / (1000 * 60 * 60 * 24) > 14) {
@@ -7711,7 +7848,7 @@
             const weekEnd = new Date(weekStart);
             weekEnd.setDate(weekStart.getDate() + 6);
             
-            state.projects.filter(p => p.status === 'active' && p.team.includes(memberId)).forEach(project => {
+            state.projects.filter(p => isWorkingStatus(p.status) && p.team.includes(memberId)).forEach(project => {
                 const activePhases = project.phases.filter(phase => {
                     const phaseStart = new Date(phase.start);
                     const phaseEnd = new Date(phase.end);
