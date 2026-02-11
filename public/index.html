@@ -8980,7 +8980,20 @@ END:VEVENT
         document.addEventListener('DOMContentLoaded', async function() {
             // Try to load data from Supabase first
             await initSupabase();
-            
+
+            // One-time migration: clear all project phases
+            if (!localStorage.getItem('phases_cleared_v1')) {
+                console.log('Migration: clearing all project phases...');
+                state.projects.forEach(p => {
+                    p.phases = [];
+                    p.currentPhase = 0;
+                });
+                localStorage.setItem('phases_cleared_v1', 'true');
+                // Force immediate save to persist the cleared phases
+                await saveToSupabase();
+                console.log('Migration complete: all phases cleared');
+            }
+
             // Then check auth and init other features
             checkAuth();
             initNotionSync();
