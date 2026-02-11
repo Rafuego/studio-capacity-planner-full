@@ -1,6 +1,9 @@
 import { NextResponse } from 'next/server';
 import { getFullData, saveFullData, supabase } from '../../../../lib/supabase';
 
+// Increase Vercel function timeout (free=10s, pro=60s)
+export const maxDuration = 60;
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',

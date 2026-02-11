@@ -9126,14 +9126,27 @@ END:VEVENT
             console.log('Data loaded from Supabase');
         }
         
-        // Save all data to Supabase
+        // Save all data to Supabase (with concurrency guard + coalescing)
+        let _isSaving = false;
+        let _pendingSave = false;
+
         async function saveToSupabase() {
             if (!supabaseSettings.apiUrl || !supabaseSettings.connected) {
                 console.log('saveToSupabase skipped: apiUrl=', supabaseSettings.apiUrl, 'connected=', supabaseSettings.connected);
                 return; // Supabase not configured, skip save
             }
-            console.log('saveToSupabase: saving', state.projects.length, 'projects, team data:', state.projects.map(p => ({name: p.name, team: p.team})));
-            
+
+            // If a save is already in flight, mark that we need another save when it finishes
+            if (_isSaving) {
+                _pendingSave = true;
+                console.log('saveToSupabase: save already in progress, queued');
+                return;
+            }
+
+            _isSaving = true;
+            _pendingSave = false;
+            console.log('saveToSupabase: saving', state.projects.length, 'projects...');
+
             try {
                 const response = await fetch(`${supabaseSettings.apiUrl}/api/supabase/sync`, {
                     method: 'POST',
@@ -9154,7 +9167,7 @@ END:VEVENT
                         projectTypes: projectTemplates
                     })
                 });
-                
+
                 const result = await response.json();
 
                 if (result.success) {
@@ -9172,6 +9185,13 @@ END:VEVENT
             } catch (error) {
                 console.error('Supabase save error:', error);
                 showSyncToast('Save failed', 'error');
+            } finally {
+                _isSaving = false;
+                // If another save was requested while we were saving, do it now with latest state
+                if (_pendingSave) {
+                    console.log('saveToSupabase: flushing pending save...');
+                    saveToSupabase();
+                }
             }
         }
         
