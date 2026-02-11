@@ -6601,7 +6601,7 @@
             }
 
             // Auto-save to Supabase
-            debouncedSaveToSupabase();
+            saveToSupabase();
         }
 
         // Edit Project Modal
@@ -6694,6 +6694,7 @@
             const project = state.projects.find(p => p.id === editingProjectId);
             if (project && project.budget?.invoices[index]) {
                 project.budget.invoices[index][field] = value;
+                debouncedSaveToSupabase();
             }
         }
         
@@ -6727,8 +6728,9 @@
                 dueDate: dueDate,
                 phaseId: null
             });
-            
+
             renderInvoicesEditor(project);
+            saveToSupabase();
         }
         
         // Delete invoice
@@ -6742,6 +6744,7 @@
                     if (confirm(`Final confirmation: Permanently delete "${invoiceName}"?`)) {
                         project.budget.invoices.splice(index, 1);
                         renderInvoicesEditor(project);
+                        saveToSupabase();
                     }
                 }
             }
@@ -6864,6 +6867,7 @@
             project.endDate = newEnd;
 
             renderPhasesEditor(project);
+            saveToSupabase();
         }
 
         function deleteAllPhases() {
@@ -6875,6 +6879,7 @@
                 project.phases = [];
                 project.currentPhase = 0;
                 renderPhasesEditor(project);
+                saveToSupabase();
             }
         }
 
@@ -6907,8 +6912,9 @@
                     if (project.phases.length > 0) {
                         project.endDate = new Date(project.phases[project.phases.length - 1].end);
                     }
-                    
+
                     renderPhasesEditor(project);
+                    saveToSupabase();
                 }
             }
         }
@@ -6959,6 +6965,7 @@
             project.endDate = new Date(project.phases[project.phases.length - 1].end);
 
             renderPhasesEditor(project);
+            saveToSupabase();
         }
 
         function setCurrentPhase(index) {
@@ -6978,8 +6985,9 @@
             for (let i = index + 1; i < project.phases.length; i++) {
                 project.phases[i].status = 'upcoming';
             }
-            
+
             renderPhasesEditor(project);
+            saveToSupabase();
         }
 
         function markPhaseComplete(index) {
@@ -6987,14 +6995,15 @@
             if (!project) return;
             
             project.phases[index].status = 'complete';
-            
+
             // If this was the current phase, move to next
             if (project.currentPhase === project.phases[index].id && index < project.phases.length - 1) {
                 project.currentPhase = project.phases[index + 1].id;
                 project.phases[index + 1].status = 'in-progress';
             }
-            
+
             renderPhasesEditor(project);
+            saveToSupabase();
         }
 
         function markPhaseIncomplete(index) {
@@ -7003,6 +7012,7 @@
             
             project.phases[index].status = 'upcoming';
             renderPhasesEditor(project);
+            saveToSupabase();
         }
 
         function saveProjectEdits() {
@@ -7213,7 +7223,7 @@
             
             closeTeamMemberModal();
             renderTeam();
-            debouncedSaveToSupabase(); // Auto-save to cloud
+            saveToSupabase(); // Auto-save to cloud
         }
         
         function deleteTeamMember(memberId) {
@@ -7241,7 +7251,7 @@
                     
                     renderTeam();
                     showSyncToast('Team member deleted', 'success');
-                    debouncedSaveToSupabase(); // Auto-save to cloud
+                    saveToSupabase(); // Auto-save to cloud
                 }
             }
         }
@@ -7379,7 +7389,7 @@
             renderProjectTypes();
             updateProjectTypeDropdown();
             document.getElementById('projectTypeModal').classList.remove('active');
-            debouncedSaveToSupabase();
+            saveToSupabase();
         }
 
         function updateProjectTypeDropdown() {
@@ -7785,7 +7795,7 @@
                 projectModal.classList.remove('active');
                 resetProjectForm();
                 switchView(state.currentView);
-                debouncedSaveToSupabase();
+                saveToSupabase();
             } else {
                 alert('Please fill in all required fields: Project Name, Client, Start Date, and End Date');
             }
@@ -7812,7 +7822,7 @@
                 document.getElementById('legacyTeamName').value = '';
                 
                 if (state.currentView === 'team') renderTeam();
-                debouncedSaveToSupabase();
+                saveToSupabase();
             }
         });
 
@@ -8278,7 +8288,7 @@
                 client.archived = true;
                 renderClients();
                 showSyncToast('Client archived', 'success');
-                debouncedSaveToSupabase(); // Auto-save to cloud
+                saveToSupabase(); // Auto-save to cloud
             }
         }
         
@@ -8309,7 +8319,7 @@
                     document.getElementById('archivedClientsModal')?.remove();
                     renderClients();
                     showSyncToast('Client deleted', 'success');
-                    debouncedSaveToSupabase(); // Auto-save to cloud
+                    saveToSupabase(); // Auto-save to cloud
                 }
             }
         }
@@ -8372,7 +8382,7 @@
                 document.getElementById('archivedClientsModal')?.remove();
                 renderClients();
                 showSyncToast('Client restored', 'success');
-                debouncedSaveToSupabase();
+                saveToSupabase();
             }
         }
         
@@ -8441,7 +8451,7 @@
             
             document.getElementById('clientModal').classList.remove('active');
             renderClients();
-            debouncedSaveToSupabase(); // Auto-save to cloud
+            saveToSupabase(); // Auto-save to cloud
         });
         
         // Render Archive
@@ -8656,7 +8666,7 @@
             
             document.getElementById('noteModal').classList.remove('active');
             if (state.currentView === 'projects') renderProjects();
-            debouncedSaveToSupabase();
+            saveToSupabase();
         });
         
         // Time Log Modal Handlers
@@ -8715,7 +8725,7 @@
             
             document.getElementById('timeLogModal').classList.remove('active');
             if (state.currentView === 'projects') renderProjects();
-            debouncedSaveToSupabase();
+            saveToSupabase();
         });
         
         // Calendar Export
