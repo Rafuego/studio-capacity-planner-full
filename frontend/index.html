@@ -8869,8 +8869,10 @@ END:VEVENT
         // Save all data to Supabase
         async function saveToSupabase() {
             if (!supabaseSettings.apiUrl || !supabaseSettings.connected) {
+                console.log('saveToSupabase skipped: apiUrl=', supabaseSettings.apiUrl, 'connected=', supabaseSettings.connected);
                 return; // Supabase not configured, skip save
             }
+            console.log('saveToSupabase: saving', state.projects.length, 'projects, team data:', state.projects.map(p => ({name: p.name, team: p.team})));
             
             try {
                 const response = await fetch(`${supabaseSettings.apiUrl}/api/supabase/sync`, {
@@ -8894,13 +8896,18 @@ END:VEVENT
                 });
                 
                 const result = await response.json();
-                
+
                 if (result.success) {
                     supabaseSettings.lastSync = new Date();
-                    showSyncToast('Saved to cloud', 'success');
+                    if (result.projectsFailed > 0) {
+                        console.warn(`Saved to cloud with ${result.projectsFailed} project errors:`, result.projectErrors);
+                        showSyncToast(`Saved (${result.projectsFailed} project errors)`, 'success');
+                    } else {
+                        showSyncToast('Saved to cloud', 'success');
+                    }
                 } else {
                     console.error('Save failed:', result.error);
-                    showSyncToast('Save failed', 'error');
+                    showSyncToast('Save failed: ' + (result.error || 'Unknown error'), 'error');
                 }
             } catch (error) {
                 console.error('Supabase save error:', error);

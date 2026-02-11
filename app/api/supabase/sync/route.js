@@ -49,12 +49,15 @@ export async function POST(request) {
     }
     
     const data = await request.json();
-    
-    await saveFullData(data);
-    
+
+    const result = await saveFullData(data);
+
     return NextResponse.json({
       success: true,
-      savedAt: new Date().toISOString()
+      savedAt: new Date().toISOString(),
+      projectsSaved: result.projectsSaved,
+      projectsFailed: result.projectsFailed,
+      projectErrors: result.projectErrors
     }, { headers: corsHeaders });
     
   } catch (error) {
