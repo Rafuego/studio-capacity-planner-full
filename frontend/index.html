@@ -2060,6 +2060,44 @@
             color: var(--text-muted);
         }
 
+        .status-badge.paused {
+            background: rgba(184, 149, 106, 0.15);
+            color: var(--accent-amber);
+        }
+
+        .status-badge.pending,
+        .status-badge.pending-approval {
+            background: rgba(184, 149, 106, 0.2);
+            color: #c9a84c;
+        }
+
+        .status-badge.canceled,
+        .status-badge.cancelled {
+            background: rgba(168, 72, 72, 0.12);
+            color: var(--accent-red);
+        }
+
+        .status-badge.retainer {
+            background: rgba(0, 212, 170, 0.12);
+            color: var(--accent-neon);
+        }
+
+        .status-badge.hourly {
+            background: rgba(107, 128, 200, 0.15);
+            color: #8b9fd4;
+        }
+
+        .status-badge.symphony {
+            background: rgba(168, 72, 104, 0.12);
+            color: var(--accent-berry);
+        }
+
+        /* Fallback for any unrecognized status */
+        .status-badge.status-other {
+            background: rgba(125, 114, 89, 0.1);
+            color: var(--text-secondary);
+        }
+
         .status-dot {
             width: 6px;
             height: 6px;
@@ -4713,7 +4751,12 @@
                             <select class="form-input" id="editProjectStatus">
                                 <option value="pipeline">Pipeline</option>
                                 <option value="active">Active</option>
+                                <option value="retainer">Retainer</option>
+                                <option value="hourly">Hourly</option>
+                                <option value="paused">Paused</option>
+                                <option value="pending approval">Pending Approval</option>
                                 <option value="completed">Completed</option>
+                                <option value="canceled">Canceled</option>
                             </select>
                         </div>
                     </div>
@@ -5887,8 +5930,9 @@
             
             html += '</div>';
             
-            // Project rows - each project gets multiple rows for phases
-            let activeProjects = state.projects.filter(p => p.status === 'active' || p.status === 'pipeline');
+            // Project rows - show all projects except completed and canceled
+            const excludedStatuses = ['completed', 'canceled', 'cancelled'];
+            let activeProjects = state.projects.filter(p => !excludedStatuses.includes((p.status || '').toLowerCase()));
             
             // Exclude projects with archived clients
             activeProjects = activeProjects.filter(p => {
@@ -6088,8 +6132,10 @@
             
             tbody.innerHTML = filteredProjects.map(project => {
                 const teamMembers = project.team.map(id => state.team.find(t => t.id === id)).filter(Boolean);
-                const statusClass = project.status;
-                const statusLabel = project.status.charAt(0).toUpperCase() + project.status.slice(1);
+                const knownStatuses = ['pipeline', 'active', 'completed', 'paused', 'pending', 'pending-approval', 'canceled', 'cancelled', 'retainer', 'hourly', 'symphony'];
+                const rawStatus = (project.status || 'pipeline').toLowerCase().replace(/\s+/g, '-');
+                const statusClass = knownStatuses.includes(rawStatus) ? rawStatus : `status-other ${rawStatus}`;
+                const statusLabel = (project.status || 'Pipeline').split(/[\s-]+/).map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
                 const projectTypeInfo = projectTemplates[project.type];
                 const typeName = projectTypeInfo ? projectTypeInfo.name : project.type;
                 const currentPhaseInfo = project.phases.find(p => p.id === project.currentPhase);
@@ -7711,7 +7757,21 @@
                 const activeProjects = clientProjects.filter(p => p.status === 'active').length;
                 const totalRevenue = clientProjects.reduce((sum, p) => sum + (p.budget?.total || 0), 0);
                 const initials = client.name.split(' ').map(w => w[0]).join('').slice(0, 2);
-                
+
+                // Build status breakdown badges
+                const statusCounts = {};
+                clientProjects.forEach(p => {
+                    const s = p.status || 'pipeline';
+                    statusCounts[s] = (statusCounts[s] || 0) + 1;
+                });
+                const knownStatuses = ['pipeline', 'active', 'completed', 'paused', 'pending', 'pending-approval', 'canceled', 'cancelled', 'retainer', 'hourly', 'symphony'];
+                const statusBadgesHtml = Object.entries(statusCounts).map(([status, count]) => {
+                    const raw = status.toLowerCase().replace(/\s+/g, '-');
+                    const cls = knownStatuses.includes(raw) ? raw : `status-other ${raw}`;
+                    const label = status.split(/[\s-]+/).map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+                    return `<span class="status-badge ${cls}" style="font-size: 11px; padding: 2px 8px;">${count} ${label}</span>`;
+                }).join('');
+
                 return `
                     <div class="client-card">
                         <div class="client-card-actions">
@@ -7756,6 +7816,11 @@
                                 <div class="client-stat-label">Revenue</div>
                             </div>
                         </div>
+                        ${clientProjects.length > 0 ? `
+                        <div style="display: flex; flex-wrap: wrap; gap: 4px; padding: 0 16px; margin-top: -4px; margin-bottom: 12px;">
+                            ${statusBadgesHtml}
+                        </div>
+                        ` : ''}
                         <div class="client-contact">
                             <a href="mailto:${client.email}">${client.email}</a><br>
                             ${client.phone}
