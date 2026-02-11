@@ -9172,6 +9172,9 @@ END:VEVENT
 
                 if (result.success) {
                     supabaseSettings.lastSync = new Date();
+                    if (result.errors?.length > 0) {
+                        console.warn('Save completed with partial errors:', result.errors);
+                    }
                     if (result.projectsFailed > 0) {
                         console.warn(`Saved to cloud with ${result.projectsFailed} project errors:`, result.projectErrors);
                         showSyncToast(`Saved (${result.projectsFailed} project errors)`, 'success');
@@ -9179,7 +9182,7 @@ END:VEVENT
                         showSyncToast('Saved to cloud', 'success');
                     }
                 } else {
-                    console.error('Save failed:', result.error);
+                    console.error('Save failed:', result.error, result.errors);
                     showSyncToast('Save failed: ' + (result.error || 'Unknown error'), 'error');
                 }
             } catch (error) {

@@ -60,7 +60,8 @@ export async function POST(request) {
       savedAt: new Date().toISOString(),
       projectsSaved: result.projectsSaved,
       projectsFailed: result.projectsFailed,
-      projectErrors: result.projectErrors
+      projectErrors: result.projectErrors,
+      errors: result.errors
     }, { headers: corsHeaders });
     
   } catch (error) {
