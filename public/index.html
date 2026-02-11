@@ -7088,7 +7088,7 @@
                            placeholder="Phase name" onchange="updatePhaseName(${index}, this.value)">
                     <input type="text" class="phase-duration-input" value="${phase.description || ''}" 
                            placeholder="Description" onchange="updatePhaseDesc(${index}, this.value)">
-                    <button class="phase-delete-btn" onclick="deletePhase(${index})" ${editingPhases.length <= 1 ? 'disabled style="opacity:0.3"' : ''}>
+                    <button class="phase-delete-btn" onclick="deleteTypePhase(${index})" ${editingPhases.length <= 1 ? 'disabled style="opacity:0.3"' : ''}>
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <polyline points="3 6 5 6 21 6"></polyline>
                             <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
@@ -7106,11 +7106,11 @@
             editingPhases[index].description = value;
         }
 
-        function deletePhase(index) {
+        function deleteTypePhase(index) {
             if (editingPhases.length <= 1) return;
-            
+
             const phaseName = editingPhases[index]?.name || `Phase ${index + 1}`;
-            
+
             if (confirm(`Delete "${phaseName}"?`)) {
                 if (confirm(`Final confirmation: Permanently delete "${phaseName}"?`)) {
                     editingPhases.splice(index, 1);
@@ -7121,7 +7121,7 @@
             }
         }
 
-        function addNewPhase() {
+        function addNewTypePhase() {
             editingPhases.push({
                 id: editingPhases.length,
                 name: '',
@@ -7186,7 +7186,7 @@
         });
 
         // Add phase button
-        document.getElementById('addPhaseBtn').addEventListener('click', addNewPhase);
+        document.getElementById('addPhaseBtn').addEventListener('click', addNewTypePhase);
 
         // Project Type Modal handlers
         const projectTypeModal = document.getElementById('projectTypeModal');
