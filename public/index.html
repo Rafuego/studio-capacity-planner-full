@@ -6512,10 +6512,10 @@
             // Close dropdown
             document.querySelectorAll('.status-dropdown.open').forEach(d => d.classList.remove('open'));
 
-            // Re-render and save
+            // Re-render and save immediately
             renderProjects();
             renderDashboard();
-            debouncedSaveToSupabase();
+            saveToSupabase();
         }
 
         // Close status dropdowns when clicking outside
@@ -7071,8 +7071,8 @@
                 autoSaveProjectToNotion(project);
             }
             
-            // Auto-save to Supabase
-            debouncedSaveToSupabase();
+            // Save to Supabase immediately (not debounced) for project edits
+            saveToSupabase();
         }
 
         // Render Team
@@ -9171,6 +9171,33 @@ END:VEVENT
             if (saveTimeout) clearTimeout(saveTimeout);
             saveTimeout = setTimeout(saveToSupabase, 2000); // Save after 2 seconds of inactivity
         }
+
+        // Flush any pending save before the user leaves/refreshes
+        window.addEventListener('beforeunload', () => {
+            if (saveTimeout) {
+                clearTimeout(saveTimeout);
+                // Use sendBeacon for reliable save on page unload
+                if (supabaseSettings.apiUrl && supabaseSettings.connected) {
+                    const payload = JSON.stringify({
+                        team: state.team,
+                        clients: state.clients,
+                        projects: state.projects.map(p => ({
+                            ...p,
+                            startDate: p.startDate instanceof Date ? p.startDate.toISOString() : p.startDate,
+                            endDate: p.endDate instanceof Date ? p.endDate.toISOString() : p.endDate,
+                            phases: (p.phases || []).map(ph => ({
+                                ...ph,
+                                start: ph.start instanceof Date ? ph.start.toISOString() : ph.start,
+                                end: ph.end instanceof Date ? ph.end.toISOString() : ph.end
+                            }))
+                        })),
+                        projectTypes: projectTemplates
+                    });
+                    navigator.sendBeacon(`${supabaseSettings.apiUrl}/api/supabase/sync`, new Blob([payload], { type: 'application/json' }));
+                    console.log('beforeunload: flushed pending save via sendBeacon');
+                }
+            }
+        });
         
         // Update Supabase status UI
         function updateSupabaseStatus() {
