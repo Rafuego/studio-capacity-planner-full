@@ -8544,18 +8544,35 @@ END:VEVENT
         // SUPABASE INTEGRATION
         // ============================================
         
+        // Auto-detect API URL: if running on a hosted domain (not localhost file://),
+        // use the same origin as the API base URL automatically
+        function getAutoApiUrl() {
+            const saved = localStorage.getItem('supabaseApiUrl');
+            if (saved) return saved;
+
+            // Auto-detect: if we're on a real hosted site, the API is on the same origin
+            const loc = window.location;
+            if (loc.protocol === 'https:' || (loc.protocol === 'http:' && loc.hostname !== '127.0.0.1' && loc.hostname !== 'localhost')) {
+                return loc.origin;
+            }
+            return '';
+        }
+
         let supabaseSettings = {
-            apiUrl: localStorage.getItem('supabaseApiUrl') || '',
+            apiUrl: getAutoApiUrl(),
             connected: false,
             lastSync: null,
         };
-        
+
         // Initialize Supabase on load
         async function initSupabase() {
-            const savedUrl = localStorage.getItem('supabaseApiUrl');
-            
-            if (savedUrl) {
-                supabaseSettings.apiUrl = savedUrl;
+            const apiUrl = supabaseSettings.apiUrl;
+
+            if (apiUrl) {
+                // Persist so Settings UI shows correctly
+                if (!localStorage.getItem('supabaseApiUrl')) {
+                    localStorage.setItem('supabaseApiUrl', apiUrl);
+                }
                 try {
                     await loadFromSupabase();
                     supabaseSettings.connected = true;
@@ -8566,7 +8583,7 @@ END:VEVENT
                     loadDefaultData();
                 }
             } else {
-                // No Supabase configured, use default data
+                // No Supabase configured (local dev), use default data
                 loadDefaultData();
             }
         }
