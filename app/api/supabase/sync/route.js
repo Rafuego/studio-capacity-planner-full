@@ -56,12 +56,13 @@ export async function POST(request) {
     const result = await saveFullData(data);
 
     return NextResponse.json({
-      success: true,
+      success: result.success,
       savedAt: new Date().toISOString(),
       projectsSaved: result.projectsSaved,
       projectsFailed: result.projectsFailed,
       projectErrors: result.projectErrors,
-      errors: result.errors
+      errors: result.errors,
+      debugInfo: result.debugInfo
     }, { headers: corsHeaders });
     
   } catch (error) {

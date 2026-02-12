@@ -9178,24 +9178,31 @@ END:VEVENT
 
                 const result = await response.json();
 
+                console.log('Sync response:', JSON.stringify(result, null, 2));
+
                 if (result.success) {
                     supabaseSettings.lastSync = new Date();
                     if (result.errors?.length > 0) {
                         console.warn('Save completed with partial errors:', result.errors);
-                    }
-                    if (result.projectsFailed > 0) {
+                        showSyncToast(`Saved (${result.errors.length} warnings)`, 'success');
+                    } else if (result.projectsFailed > 0) {
                         console.warn(`Saved to cloud with ${result.projectsFailed} project errors:`, result.projectErrors);
                         showSyncToast(`Saved (${result.projectsFailed} project errors)`, 'success');
                     } else {
                         showSyncToast('Saved to cloud', 'success');
                     }
                 } else {
-                    console.error('Save failed:', result.error, result.errors);
-                    showSyncToast('Save failed: ' + (result.error || 'Unknown error'), 'error');
+                    // Build a useful error message
+                    let errMsg = result.error || 'Unknown error';
+                    if (result.errors?.length > 0) {
+                        errMsg = result.errors.map(e => `${e.step}: ${e.error}`).join('; ');
+                    }
+                    console.error('Save FAILED. Full response:', JSON.stringify(result, null, 2));
+                    showSyncToast('Sync Failed: ' + errMsg.substring(0, 100), 'error');
                 }
             } catch (error) {
-                console.error('Supabase save error:', error);
-                showSyncToast('Save failed', 'error');
+                console.error('Supabase save network error:', error);
+                showSyncToast('Sync Failed: ' + error.message, 'error');
             } finally {
                 _isSaving = false;
                 // If another save was requested while we were saving, do it now with latest state
