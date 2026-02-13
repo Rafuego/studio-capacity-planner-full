@@ -4638,6 +4638,16 @@
                                     Disconnect
                                 </button>
                             </div>
+                            <div style="margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border);">
+                                <button class="btn btn-secondary" onclick="resetAllData()" style="color: var(--accent-red); border-color: var(--accent-red);">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <polyline points="3 6 5 6 21 6"></polyline>
+                                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                                    </svg>
+                                    Reset All Data
+                                </button>
+                                <p style="margin-top: 8px; font-size: 12px; color: var(--text-muted);">Permanently deletes all projects, clients, team members, and related data.</p>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -9107,24 +9117,22 @@ END:VEVENT
             }
             
             const data = result.data;
-            
-            // Update state with loaded data (accept empty arrays to clear stale data)
-            if (data.team) state.team = data.team;
-            if (data.clients) state.clients = data.clients;
-            if (data.projects) {
-                state.projects = data.projects.map(p => ({
-                    ...p,
-                    startDate: p.startDate ? new Date(p.startDate) : new Date(),
-                    endDate: p.endDate ? new Date(p.endDate) : new Date(),
-                    phases: (p.phases || []).map(ph => ({
-                        ...ph,
-                        start: ph.start ? new Date(ph.start) : new Date(),
-                        end: ph.end ? new Date(ph.end) : new Date()
-                    }))
-                }));
-            }
-            if (data.archivedProjects) state.archivedProjects = data.archivedProjects;
-            if (data.projectTypes) {
+
+            // Always set state from Supabase (including empty arrays — that means DB is empty)
+            state.team = data.team || [];
+            state.clients = data.clients || [];
+            state.projects = (data.projects || []).map(p => ({
+                ...p,
+                startDate: p.startDate ? new Date(p.startDate) : new Date(),
+                endDate: p.endDate ? new Date(p.endDate) : new Date(),
+                phases: (p.phases || []).map(ph => ({
+                    ...ph,
+                    start: ph.start ? new Date(ph.start) : new Date(),
+                    end: ph.end ? new Date(ph.end) : new Date()
+                }))
+            }));
+            state.archivedProjects = data.archivedProjects || [];
+            if (data.projectTypes && Object.keys(data.projectTypes).length > 0) {
                 Object.assign(projectTemplates, data.projectTypes);
             }
             
@@ -9316,7 +9324,43 @@ END:VEVENT
                 showSyncToast('Disconnected from Supabase', 'success');
             }
         }
-        
+
+        // Reset all data — wipe Supabase and local state
+        async function resetAllData() {
+            if (!confirm('⚠️ DELETE ALL DATA?\n\nThis will permanently remove ALL projects, clients, team members, phases, invoices, and notes from the database.\n\nThis cannot be undone.')) {
+                return;
+            }
+            if (!confirm('Are you absolutely sure? Type OK to confirm.')) {
+                return;
+            }
+
+            showSyncToast('Clearing all data...', 'success');
+
+            try {
+                if (supabaseSettings.apiUrl) {
+                    const response = await fetch(`${supabaseSettings.apiUrl}/api/supabase/reset`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' }
+                    });
+                    const result = await response.json();
+                    console.log('Reset result:', result);
+                }
+
+                // Clear local state
+                state.team = [];
+                state.clients = [];
+                state.projects = [];
+                state.archivedProjects = [];
+
+                // Re-render
+                renderCurrentView();
+                showSyncToast('All data cleared', 'success');
+            } catch (error) {
+                console.error('Reset failed:', error);
+                showSyncToast('Reset failed: ' + error.message, 'error');
+            }
+        }
+
         // Manual save to Supabase (forced — bypasses concurrency guard)
         async function manualSaveToSupabase() {
             if (!supabaseSettings.connected) {
