@@ -9190,6 +9190,13 @@ END:VEVENT
 
                 if (result.success) {
                     supabaseSettings.lastSync = new Date();
+                    // Reload from DB to get canonical data with server-assigned IDs
+                    try {
+                        await loadFromSupabase();
+                        renderCurrentView();
+                    } catch (reloadErr) {
+                        console.warn('Post-save reload failed:', reloadErr);
+                    }
                     if (result.errors?.length > 0) {
                         console.warn('Save completed with partial errors:', result.errors);
                         showSyncToast(`Saved (${result.errors.length} warnings)`, 'success');
